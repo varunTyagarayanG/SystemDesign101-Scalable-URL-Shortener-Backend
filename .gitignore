@@ -1,0 +1,13 @@
+# Node
+node_modules/
+npm-debug.log
+
+# Environment
+.env
+
+# Logs
+logs/
+*.log
+
+# Docker
+docker-compose.override.yml
