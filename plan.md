@@ -70,3 +70,28 @@
 - Monitor logs, metrics, queue backlog  
 - Tweak connection-pool sizes, cache TTL, and key-generator batching  
 - Prepare a brief write-up or demo script showcasing each feature  
+
+
+
+
+
+# 1. Build images and start all services in detached mode
+docker-compose up --build -d
+
+# 2. List services and their status
+docker-compose ps
+
+# 3. Tail the backend logs to watch startup messages
+docker-compose logs -f backend
+
+# 4. Health-check the Express app
+curl http://localhost:3000/health
+
+# 5. Verify database connections
+curl http://localhost:3000/db-check
+
+# 6. Stop all running containers (keep volumes/networks)
+docker-compose stop
+
+# (Optional) Tear everything down (remove containers, networks, named volumes)
+docker-compose down -v
