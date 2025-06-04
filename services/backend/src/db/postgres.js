@@ -1,8 +1,10 @@
-// services/backend/src/db/postgres.js
 const { Pool } = require('pg');
-const pool = new Pool({ connectionString: process.env.PG_URI });
 
-async function connectPostgres(retries = 10, delayMs = 2000) {
+const pool = new Pool({
+    connectionString: process.env.PG_URI
+});
+
+async function connectPostgres(retries = 5, delayMs = 2000) {
     for (let i = 1; i <= retries; i++) {
         try {
             await pool.query('SELECT 1');
@@ -10,10 +12,9 @@ async function connectPostgres(retries = 10, delayMs = 2000) {
             return;
         } catch (err) {
             console.warn(
-                `Postgres connection attempt ${i} failed (${err.message}). ` +
-                `Retrying in ${delayMs}ms…`
+                `Postgres connection attempt ${i} failed (${err.message}). Retrying in ${delayMs}ms…`
             );
-            await new Promise(r => setTimeout(r, delayMs));
+            await new Promise((r) => setTimeout(r, delayMs));
         }
     }
     console.error(`Failed to connect to Postgres after ${retries} attempts.`);

@@ -1,35 +1,9 @@
 version: '3.8'
 
 services:
-  backend:
-    build: ./services/backend
-    env_file: .env
-    depends_on:
-      - postgres
-      - mongo
-      - redis
-      - rabbitmq
-    ports:
-      - "3000:3000"
-  auth-service:
-    build: ./services/auth-service
-    env_file: .env
-    depends_on:
-      - postgres
-
-  key-generator-service:
-    build: ./services/key-generator-service
-    env_file: .env
-    depends_on:
-      - postgres
-
-  analytics-service:
-    build: ./services/analytics-service
-    env_file: .env
-    depends_on:
-      - rabbitmq
-      - mongo
-
+  ##############################################################################
+  # 1. POSTGRES: initialize `keys` table via init.sql, expose port 5432 to host #
+  ##############################################################################
   postgres:
     image: postgres:13
     env_file: .env
@@ -37,6 +11,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - ./databases/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -45,6 +22,47 @@ services:
     ports:
       - "5432:5432"
 
+  ################################################################################
+  # 2. PRELOAD-KEYS: one-off job to populate `keys` table. Runs once, then exits. #
+  ################################################################################
+  preload-keys:
+    image: node:18-alpine
+    working_dir: /app
+    env_file: .env
+    volumes:
+      - ./:/app
+    depends_on:
+      - postgres
+    command: >
+      sh -c "
+        npm install pg dotenv &&
+        node scripts/preload-keys.js
+      "
+
+  ########################################################################
+  # 3. KEY-GENERATOR-SERVICE: /generate endpoint, depends on keys table  #
+  ########################################################################
+  key-generator-service:
+    build: ./services/key-generator-service
+    env_file: .env
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+      - preload-keys
+
+  ############################################################################
+  # 4. REDIS: in-memory cache                                                #
+  ############################################################################
+  redis:
+    image: redis:6
+    restart: always
+    ports:
+      - "6379:6379"
+
+  ############################################################################
+  # 5. MONGO: stores URL mappings                                             #
+  ############################################################################
   mongo:
     image: mongo:5
     restart: always
@@ -53,12 +71,9 @@ services:
     ports:
       - "27017:27017"
 
-  redis:
-    image: redis:6
-    restart: always
-    ports:
-      - "6379:6379"
-
+  ############################################################################
+  # 6. RABBITMQ: analytics queue                                              #
+  ############################################################################
   rabbitmq:
     image: rabbitmq:3-management
     restart: always
@@ -66,6 +81,48 @@ services:
       - "5672:5672"
       - "15672:15672"
 
+  ############################################################################
+  # 7. AUTH-SERVICE: JWT-based user auth                                       #
+  ############################################################################
+  auth-service:
+    build: ./services/auth-service
+    env_file: .env
+    depends_on:
+      - postgres
+    ports:
+      - "4001:4001"
+
+  ############################################################################
+  # 8. BACKEND: main Express app                                              #
+  #    - No host port binding (uses `expose` instead)                          #
+  ############################################################################
+  backend:
+    build: ./services/backend
+    env_file: .env
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+      - rabbitmq
+      - key-generator-service
+    expose:
+      - "3000"
+
+  ############################################################################
+  # 9. ANALYTICS-SERVICE: consumes RabbitMQ events, writes to Mongo or TSDB    #
+  ############################################################################
+  analytics-service:
+    build: ./services/analytics-service
+    env_file: .env
+    depends_on:
+      - rabbitmq
+      - mongo
+    ports:
+      - "4002:4002"
+
+  ############################################################################
+  # 10. NGINX: load-balancer for backend replicas                              #
+  ############################################################################
   nginx:
     image: nginx:latest
     volumes:
@@ -75,6 +132,9 @@ services:
     depends_on:
       - backend
 
+  ############################################################################
+  # 11. PROMETHEUS & GRAFANA: metrics & dashboards                             #
+  ############################################################################
   prometheus:
     image: prom/prometheus
     volumes:
@@ -86,3 +146,6 @@ services:
     image: grafana/grafana
     ports:
       - "3001:3000"
+
+volumes:
+  pgdata:

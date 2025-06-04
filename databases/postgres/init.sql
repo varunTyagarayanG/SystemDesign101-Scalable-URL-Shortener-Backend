@@ -1,8 +1,7 @@
--- url-shortener/databases/postgres/init.sql
+-- This script runs when the postgres container first initializes.
+-- It will create the `keys` table if it doesn't exist.
 CREATE TABLE
-    IF NOT EXISTS urls (
-        id SERIAL PRIMARY KEY,
-        short_key VARCHAR(10) UNIQUE NOT NULL,
-        original_url TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW ()
+    IF NOT EXISTS keys (
+        short_id VARCHAR(10) PRIMARY KEY,
+        used BOOLEAN NOT NULL DEFAULT FALSE
     );
