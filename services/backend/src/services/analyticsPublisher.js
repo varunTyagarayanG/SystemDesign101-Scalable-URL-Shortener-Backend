@@ -7,9 +7,11 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL;
 
 let connection, channel;
 
-// Try to connect up to `retries` times, waiting `delayMs` between attempts
-async function connectRabbitMQ(retries = 5, delayMs = 2000) {
-    for (let i = 1; i <= retries; i++) {
+/**
+ * Connect to RabbitMQ, retrying indefinitely with a short delay until successful.
+ */
+async function connectRabbitMQ(delayMs = 2000) {
+    while (true) {
         try {
             connection = await amqplib.connect(RABBITMQ_URL);
             channel = await connection.createChannel();
@@ -18,18 +20,16 @@ async function connectRabbitMQ(retries = 5, delayMs = 2000) {
             return;
         } catch (err) {
             console.warn(
-                `RabbitMQ connection attempt ${i} failed (${err.message}). Retrying in ${delayMs}ms…`
+                `RabbitMQ connection failed (${err.message}). Retrying in ${delayMs}ms…`
             );
             await new Promise((r) => setTimeout(r, delayMs));
         }
     }
-    console.error(`Failed to connect to RabbitMQ after ${retries} attempts.`);
-    process.exit(1);
 }
 
 async function publishEvent(eventType, payload) {
     if (!channel) {
-        console.error('RabbitMQ channel not initialized');
+        console.error('RabbitMQ channel not initialized; dropping event');
         return;
     }
     const message = {
