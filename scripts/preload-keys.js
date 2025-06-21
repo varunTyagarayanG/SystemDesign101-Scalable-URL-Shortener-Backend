@@ -10,13 +10,10 @@
 
 const { Pool } = require('pg');
 
-// Read PG_URI from environment
 require('dotenv').config();
 const PG_URI = process.env.LOCAL_PG_URI || process.env.PG_URI;
 
-// Number of keys to generate (example: 1 million)
 const TOTAL_KEYS = 1000000;
-// Batch size per INSERT
 const BATCH_SIZE = 10000;
 
 const pool = new Pool({ connectionString: PG_URI });
@@ -25,7 +22,6 @@ const pool = new Pool({ connectionString: PG_URI });
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const KEY_LENGTH = 7;
 
-// Function to generate one random base62 key of length KEY_LENGTH
 function generateKey() {
     let key = '';
     for (let i = 0; i < KEY_LENGTH; i++) {

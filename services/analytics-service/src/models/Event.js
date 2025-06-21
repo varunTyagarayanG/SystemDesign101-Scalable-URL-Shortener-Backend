@@ -3,11 +3,11 @@
 const mongoose = require('mongoose');
 
 const eventSchema = new mongoose.Schema({
-    type: { type: String, required: true },      // "create" or "redirect"
+    type: { type: String, required: true }, 
     shortId: { type: String, required: true },
     longUrl: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
-    cacheHit: { type: Boolean, default: null }    // only for "redirect" events
+    cacheHit: { type: Boolean, default: null }  
 });
 
 module.exports = mongoose.model('Event', eventSchema);

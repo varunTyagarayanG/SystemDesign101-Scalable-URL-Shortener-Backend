@@ -10,7 +10,6 @@ const urlSchema = new mongoose.Schema({
     deleted: { type: Boolean, default: false }
 });
 
-// TTL index: remove when expiresAt < now
 urlSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('Url', urlSchema);
