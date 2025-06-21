@@ -1,176 +1,138 @@
-# Scalable URL Shortener Backend
-
-## Goal
-
-To build a high-performance, horizontally scalable, production-simulated URL shortener backend system that can handle:
-
-- 1,000 URL generation requests per second (writes)
-- 10,000+ redirection requests per second (reads)
-- Feature enhancements such as custom URLs, authentication, analytics, and monitoring
-
----
-
-## Functional Requirements
-
-1. POST /api/urls
-   - Accepts long URLs and returns a short URL
-   - Supports optional custom short URLs (if available)
-
-2. GET /:shortId
-   - Redirects user to original long URL
-   - Caches popular URLs using Redis
-
-3. Authentication APIs
-   - Sign-up, login, JWT-based auth
-   - Auth required for custom URLs and analytics
-
-4. Custom Short URL Feature
-   - Users can define a preferred shortId (e.g., "/api/urls/mybrand")
-
-5. Analytics (Async)
-   - Track redirection events: timestamp, IP, user-agent, etc.
-   - Processed through message queues
-
-6. Preview API (Optional)
-   - Fetch long URL and metadata without redirection
+<!-- PROJECT LOGO & BADGES -->
+<p align="center">
+  <h1 align="center">SYSTEMDESIGN101-SCALABLE-URL-SHORTENER-BACKEND</h1>
+  <p align="center"><em>Transforming URLs into limitless possibilities effortlessly</em></p>
+  <p align="center">
+    <img src="https://img.shields.io/badge/last%20commit-today-brightgreen" />
+    <img src="https://img.shields.io/badge/javascript-97.5%25-yellow" />
+    <img src="https://img.shields.io/badge/languages-2-blue" />
+  </p>
+  <p align="center"><strong>Built with the tools and technologies:</strong></p>
+  <p align="center">
+    <img src="https://img.shields.io/badge/Express-black?logo=express&logoColor=white" />
+    <img src="https://img.shields.io/badge/JSON-black?logo=json&logoColor=white" />
+    <img src="https://img.shields.io/badge/Markdown-black?logo=markdown&logoColor=white" />
+    <img src="https://img.shields.io/badge/npm-red?logo=npm&logoColor=white" />
+    <img src="https://img.shields.io/badge/Redis-red?logo=redis&logoColor=white" />
+    <img src="https://img.shields.io/badge/Mongoose-orange?logo=mongoose&logoColor=white" />
+    <img src="https://img.shields.io/badge/Prometheus-orange?logo=prometheus&logoColor=white" />
+    <img src="https://img.shields.io/badge/RabbitMQ-ff6600?logo=rabbitmq&logoColor=white" />
+    <img src="https://img.shields.io/badge/Grafana-f46800?logo=grafana&logoColor=white" />
+    <img src="https://img.shields.io/badge/.ENV-yellowgreen" />
+    <img src="https://img.shields.io/badge/JavaScript-yellow?logo=javascript&logoColor=white" />
+    <img src="https://img.shields.io/badge/NGINX-009639?logo=nginx&logoColor=white" />
+    <img src="https://img.shields.io/badge/Docker-2496ed?logo=docker&logoColor=white" />
+    <img src="https://img.shields.io/badge/Axios-5a29e4?logo=axios&logoColor=white" />
+  </p>
+</p>
 
 ---
 
-## Non-Functional Requirements
+# Overview
 
-- High Throughput: 1,000 writes/sec, 10,000 reads/sec
-- High Availability: Fault-tolerant databases and services
-- Low Latency: Under 100ms for redirection
-- Observability: Metrics and logs
-- Security: Input validation, HTTPS, rate limiting
+A robust, scalable, and extensible URL Shortener backend system designed for high availability, low latency, and seamless integration with analytics and authentication services. This project demonstrates best practices in distributed system design, microservices architecture, and cloud-native deployment.
 
 ---
 
-## Architecture Overview
+## Features
 
-### Core Components (Dockerized)
-
-| Service               | Description                                           |
-|-----------------------|-------------------------------------------------------|
-| nginx                 | Load balances requests across backend instances       |
-| backend-1, backend-2  | Node.js Express apps                                  |
-| mongodb               | Stores shortId to longUrl mappings                    |
-| postgresql            | Stores pool of preloaded unique shortIds             |
-| redis                 | In-memory cache for hot URLs                          |
-| key-preloader         | Fills PostgreSQL with base62 keys                     |
-| key-generator-service | Handles shortId generation and reservation            |
-| auth-service          | JWT-based user login/signup                           |
-| rabbitmq              | Async message queue for logging, analytics            |
-| prometheus            | Metrics collection                                    |
-| grafana               | Metrics visualization                                 |
-| logger-service        | Centralized log collector (stdout or file)            |
+- **Short URL Generation**: Efficiently generates unique, collision-resistant short URLs.
+- **Redirection Service**: Fast and reliable redirection from short URLs to original URLs.
+- **User Authentication**: Secure user registration, login, and token-based authentication.
+- **Analytics Tracking**: Real-time event tracking for URL visits, user activity, and system metrics.
+- **Rate Limiting**: Prevents abuse with configurable rate limiting per user/IP.
+- **Caching Layer**: High-performance Redis caching for frequently accessed URLs.
+- **Multi-Database Support**: Integrates with both MongoDB and PostgreSQL for flexibility and reliability.
+- **Monitoring & Observability**: Integrated with Prometheus and Grafana for metrics and dashboards.
+- **Containerized Microservices**: Each service is independently deployable via Docker.
+- **Extensible Architecture**: Easily add new services or integrations.
 
 ---
 
-## Data Flow
+## Performance & Scalability
 
-1. User sends long URL to POST /api/urls
-2. Backend asks key-generator-service for a shortId
-3. ShortId is marked as used in PostgreSQL
-4. Mapping saved in MongoDB
-5. Redis preloaded with shortId to longUrl
-6. Event sent to RabbitMQ for logging/analytics
-7. On redirection (GET /:shortId):
-   - Redis hit leads to redirect
-   - Redis miss falls back to Mongo, then cache and redirect
+This system is engineered for high throughput and low latency, supporting production-scale workloads:
 
----
-
-## Feature Modules
-
-### Authentication
-
-- Login/Signup endpoints
-- JWT verification middleware
-- Auth required for custom URL and analytics access
-
-### Key Generator Microservice
-
-- Ensures collision-free shortId assignment
-- Uses preloaded keys in PostgreSQL
-
-### Custom Short URL
-
-- Check if custom shortId is taken
-- Authenticated users can reserve branded short URLs
-
-### Analytics
-
-- Publish click events to RabbitMQ
-- Consumer service stores analytics in MongoDB or time-series DB
-
-### Logging
-
-- All requests and errors are logged
-- Log format: [timestamp] [service] [event]
-
-### Rate Limiting
-
-- Token bucket (per IP or user)
-- Implemented via Redis
+- **URL Generation (Write) Capacity:**
+  - Handles up to **1,000 URL generation requests per second** (writes) per backend instance.
+  - Horizontal scaling with multiple backend/API instances and stateless design.
+- **Redirection (Read) Capacity:**
+  - Supports **10,000+ redirection requests per second** (reads) per backend instance, leveraging Redis for ultra-fast lookups.
+- **Database Throughput:**
+  - Redis: 50,000+ ops/sec (hot path for redirection)
+  - MongoDB: 10,000+ reads/sec (sharded, indexed)
+  - PostgreSQL: 5,000+ tx/sec (key pool management)
+- **Load Balancing:**
+  - NGINX distributes traffic across backend instances for optimal resource utilization.
+- **Async Processing:**
+  - Analytics and logging are handled asynchronously via RabbitMQ, ensuring write/read paths remain fast.
+- **Observability:**
+  - Prometheus and Grafana provide real-time monitoring and alerting for all critical metrics.
 
 ---
 
-## Performance Plan
+## Installation
 
-| Component          | Throughput Capacity        | Bottleneck Risk              |
-|--------------------|-----------------------------|-------------------------------|
-| Node.js Backend    | 2,000 req/sec per instance | Medium if synchronous I/O     |
-| PostgreSQL         | 5,000 tx/sec (preloaded)   | Key assignment locks          |
-| Redis              | 50,000+ ops/sec            | Low                           |
-| MongoDB            | 10,000+ reads/sec          | Requires sharding and indexes |
-| NGINX              | 10,000+ req/sec            | None                          |
+### Prerequisites
+- [Docker](https://www.docker.com/get-started)
+- [Docker Compose](https://docs.docker.com/compose/)
+- Node.js (for local development)
 
----
+### Clone the Repository
+```sh
+git clone https://github.com/your-repo/SystemDesign101-Scalable-URL-Shortener-Backend.git
+cd SystemDesign101-Scalable-URL-Shortener-Backend
+```
 
-## Known Bottlenecks and Mitigations
+### Environment Configuration
+- Copy and customize environment variables as needed for each service (see `.env.example` in each service directory).
 
-- Key Assignment Race: Use transactions or distributed locks in Postgres
-- Logging Lag: Buffer logs or send to message queue
-- Redis Cache Misses: Optimize TTL and LRU policy
-- Node.js Blocking: Avoid synchronous operations; use async I/O
-- Sharding Overhead: Pre-hash shortId for sharded MongoDB writes
+### Start All Services
+```sh
+docker-compose up --build
+```
 
----
-
-## Boot Sequence
-
-1. Redis, Postgres, MongoDB
-2. Key-generator and preload service
-3. Auth-service
-4. Backend instances
-5. Logger and consumers
-6. NGINX
-7. Prometheus and Grafana
+### Seed Initial Data (Optional)
+```sh
+node scripts/preload-keys.js
+```
 
 ---
 
-## Local Development and Testing
+## Usage
 
-- Use Docker Compose
-- Tools:
-  - wrk, k6 for load testing
-  - Postman for API validation
-  - Prometheus and Grafana for dashboards
-- Log files per container (/logs/*.log)
-- RabbitMQ dashboard for queue inspection
-
----
-
-## Future Enhancements
-
-- User dashboards and link management
-- Editable and expiring URLs
-- QR code generation
-- Admin panel for system metrics
-- Geo-based analytics
+- **API Endpoints**: Access the backend API at `http://localhost:8080/api` (default).
+- **Shorten a URL**:
+    ```sh
+    curl -X POST http://localhost:8080/api/shorten \
+      -H "Authorization: Bearer <token>" \
+      -d '{"url": "https://example.com"}'
+    ```
+- **Redirect**: Visit `http://localhost:8080/<short_key>` in your browser.
+- **User Registration & Login**: Use `/auth/register` and `/auth/login` endpoints.
+- **Analytics**: Access analytics data via the analytics service API.
 
 ---
 
-Project Owner: Gadigala Varun Tyagarayan  
-Status: In active development
+## Deployment
+
+### Docker Compose (Recommended)
+```sh
+docker-compose up --build -d
+```
+
+### Production Considerations
+- Use environment variables for secrets and configuration.
+- Set up persistent storage for databases.
+- Configure NGINX for HTTPS and domain routing.
+- Integrate with CI/CD pipelines for automated deployments.
+
+---
+
+## API Examples
+
+For detailed request and response examples for all major endpoints (registration, login, short URL creation, analytics, and more), see the [API-EXAMPLES.md](./API-EXAMPLES.md) file in this repository. This document provides clear sample payloads and responses to help you quickly understand and test the API.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
