@@ -133,6 +133,71 @@ docker-compose up --build -d
 
 For detailed request and response examples for all major endpoints (registration, login, short URL creation, analytics, and more), see the [API-EXAMPLES.md](./API-EXAMPLES.md) file in this repository. This document provides clear sample payloads and responses to help you quickly understand and test the API.
 
+---
+
+## Process Flow
+
+This section describes the end-to-end flow of how the URL Shortener system processes requests:
+
+1. **User Registration & Authentication**
+   - A user registers and logs in to receive a JWT token for authenticated actions.
+
+2. **Short URL Generation**
+   - The user sends a POST request to `/api/urls` with the long URL (and optionally an alias or expiry).
+   - The backend authenticates the user and requests a unique short ID from the Key Generator service.
+   - The mapping of short ID to long URL is stored in MongoDB.
+   - The short URL is cached in Redis for fast future lookups.
+
+3. **Redirection**
+   - When a user accesses a short URL, the backend first checks Redis for the mapping.
+   - If not found in Redis, it queries MongoDB, then updates the cache.
+   - The user is redirected to the original long URL.
+
+4. **Analytics & Monitoring**
+   - Each redirection event is published asynchronously to RabbitMQ.
+   - The Analytics service consumes these events and updates statistics (e.g., redirect count, cache hits/misses).
+   - Prometheus and Grafana monitor system health and performance metrics.
+
+5. **Custom/Alias URLs**
+   - Authenticated users can request custom aliases for their short URLs.
+   - The backend checks for alias availability before assignment.
+
+6. **Security & Rate Limiting**
+   - All sensitive endpoints require JWT authentication.
+   - Rate limiting is enforced per user/IP using Redis to prevent abuse.
+
+---
+
+## Docker Compose Flow
+
+When you run `docker-compose up --build`, the following sequence occurs:
+
+1. **Network & Volumes**
+   - Docker Compose creates a dedicated network and any required volumes for persistent data (e.g., for MongoDB, PostgreSQL).
+
+2. **Database Containers**
+   - MongoDB, PostgreSQL, and Redis containers are started first to ensure data services are available for dependent services.
+
+3. **Message Broker & Monitoring**
+   - RabbitMQ (for async analytics/logging) and monitoring tools (Prometheus, Grafana) are started.
+
+4. **Key Generator & Supporting Services**
+   - The Key Generator service and any preload/utility scripts are launched to prepare the key pool and initial data.
+
+5. **Core Application Services**
+   - Backend, Auth, and Analytics services are started. These connect to the databases, cache, and message broker.
+
+6. **NGINX Gateway**
+   - NGINX is started last, acting as a reverse proxy and load balancer for all incoming API traffic.
+
+7. **Health Checks & Readiness**
+   - Each service may perform health checks and wait for dependencies to be ready before accepting traffic.
+
+8. **Live System**
+   - The system is now fully operational. You can interact with all APIs, and all monitoring/analytics dashboards are available at their respective ports.
+
+---
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
