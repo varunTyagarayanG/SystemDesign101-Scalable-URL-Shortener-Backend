@@ -1,6 +1,6 @@
 <!-- PROJECT LOGO & BADGES -->
 <p align="center">
-  <h1 align="center">SYSTEMDESIGN101-SCALABLE-URL-SHORTENER-BACKEND</h1>
+  <h1 align="center">SCALABLE URL SHORTENER BACKEND</h1>
   <p align="center"><em>Transforming URLs into limitless possibilities effortlessly</em></p>
   <p align="center">
     <img src="https://img.shields.io/badge/last%20commit-today-brightgreen" />
