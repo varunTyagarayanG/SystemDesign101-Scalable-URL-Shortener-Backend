@@ -8,6 +8,6 @@ npm-debug.log
 # Logs
 logs/
 *.log
-
+shan.md
 # Docker
 docker-compose.override.yml

@@ -12,7 +12,7 @@ const { pool, connectPostgres } = require('./db/postgres');
 const { client: redisClient, connectRedis } = require('./cache/redisClient');
 const { connectRabbitMQ } = require('./services/analyticsPublisher');
 const urlRoutes = require('./routes/urlRoutes');
-
+const rateLimiter = require('./middleware/rateLimiter');
 dotenv.config();
 
 const app = express();

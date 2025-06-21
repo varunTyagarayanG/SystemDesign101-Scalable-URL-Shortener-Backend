@@ -10,23 +10,30 @@ const BASE_URL = process.env.BASE_URL;    // e.g. "http://localhost"
 const KEYGEN_URL = process.env.KEYGEN_URL;  // e.g. "http://key-generator-service:4000"
 
 /**
- * Create a new short URL (either auto-generated or a custom alias).
- *
- * @param {string} longUrl
- * @param {string} [customAlias]
- * @returns {Promise<string>} full short URL (e.g. "http://localhost/Ab3kLz9")
+ * Create a new short URL (auto‐gen or custom alias),
+ * with optional expiry. Also sets Redis TTL to match expiresAt.
  */
-async function createShortUrl(longUrl, customAlias) {
+async function createShortUrl(longUrl, customAlias, expiresAt) {
     let shortId;
 
+    // 1) Parse & validate expiresAt
+    let expiryDate = null;
+    if (expiresAt) {
+        expiryDate = new Date(expiresAt);
+        if (isNaN(expiryDate) || expiryDate <= Date.now()) {
+            const err = new Error('expiresAt must be a valid ISO date in the future');
+            err.code = 'INVALID_EXPIRY';
+            throw err;
+        }
+    }
+
+    // 2) Acquire a shortId (alias or auto‐gen)
     if (customAlias) {
-        // validate alias format
         if (!/^[A-Za-z0-9_-]{4,20}$/.test(customAlias)) {
-            const err = new Error('Invalid alias');
+            const err = new Error('Alias must be 4–20 chars, alphanumeric, underscore or hyphen');
             err.code = 'INVALID_ALIAS';
             throw err;
         }
-        // attempt to reserve in Postgres
         try {
             await pool.query(
                 'INSERT INTO keys (short_id, used) VALUES ($1, TRUE)',
@@ -34,7 +41,6 @@ async function createShortUrl(longUrl, customAlias) {
             );
             shortId = customAlias;
         } catch (e) {
-            // unique violation => already taken
             if (e.code === '23505') {
                 const err = new Error('Alias already in use');
                 err.code = 'ALIAS_TAKEN';
@@ -43,48 +49,65 @@ async function createShortUrl(longUrl, customAlias) {
             throw e;
         }
     } else {
-        // fetch auto-generated ID from key-generator service
         const resp = await axios.get(`${KEYGEN_URL}/generate`);
         shortId = resp.data.shortId;
     }
 
-    // store mapping in MongoDB
-    await Url.create({ shortId, longUrl });
+    // 3) Persist in Mongo
+    await Url.create({
+        shortId,
+        longUrl,
+        expiresAt: expiryDate,
+        deleted: false
+    });
 
-    // prime Redis cache
+    // 4) Cache in Redis, with TTL if expiresAt set
     await redisClient.set(shortId, longUrl);
+    if (expiryDate) {
+        const seconds = Math.ceil((expiryDate.getTime() - Date.now()) / 1000);
+        await redisClient.expire(shortId, seconds);
+    }
 
-    // publish “create” analytics event
+    // 5) Publish analytics
     publishEvent('create', { shortId, longUrl });
 
-    // return the shortened URL at root path
     return `${BASE_URL}/${shortId}`;
 }
 
 /**
- * Look up a shortId and return its long URL.
- * Also updates cache on miss and publishes a redirect analytics event.
- *
- * @param {string} shortId
- * @returns {Promise<string|null>} the long URL or null if not found
+ * Lookup a shortId in Redis first, then Mongo.
+ * Expired keys will be gone from Redis (due to expire()),
+ * and also filtered out by Mongo’s TTL/index or filter.
  */
 async function getLongUrl(shortId) {
-    // try Redis first
+    // 1) Try Redis cache
     let longUrl = await redisClient.get(shortId);
     const cacheHit = Boolean(longUrl);
 
     if (!longUrl) {
-        // cache miss → fetch from Mongo
-        const doc = await Url.findOne({ shortId });
+        // 2) Cache miss → fetch from Mongo, excluding deleted or expired
+        const now = new Date();
+        const doc = await Url.findOne({
+            shortId,
+            deleted: false,
+            $or: [
+                { expiresAt: null },
+                { expiresAt: { $gt: now } }
+            ]
+        });
         if (!doc) return null;
         longUrl = doc.longUrl;
-        // prime Redis
+
+        // 3) Prime Redis again (with no TTL if no expiry)
         await redisClient.set(shortId, longUrl);
+        if (doc.expiresAt) {
+            const seconds = Math.ceil((doc.expiresAt.getTime() - Date.now()) / 1000);
+            await redisClient.expire(shortId, seconds);
+        }
     }
 
-    // publish “redirect” analytics event
+    // 4) Analytics
     publishEvent('redirect', { shortId, longUrl, cacheHit });
-
     return longUrl;
 }
 
